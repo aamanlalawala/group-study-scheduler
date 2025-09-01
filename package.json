@@ -1,0 +1,23 @@
+{
+  "name": "group-study-scheduler",
+  "version": "1.0.0",
+  "description": "A web app for students to coordinate study groups, schedule sessions, assign tasks, and share notes.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aamanlalawala/group-study-scheduler.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/aamanlalawala/group-study-scheduler/issues"
+  },
+  "homepage": "https://github.com/aamanlalawala/group-study-scheduler#readme",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
