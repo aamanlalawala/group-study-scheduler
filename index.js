@@ -14,6 +14,10 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+
+// Middleware to parse JSON requests
+app.use(express.json());
+
 // MySQL connection
 const db = mysql.createConnection({
   host: 'localhost',
@@ -26,9 +30,6 @@ db.connect((err) => {
   if (err) console.error('Error connecting to MySQL:', err);
   else console.log('Connected to MySQL database');
 });
-
-// Middleware to parse JSON requests
-app.use(express.json());
 
 // Basic route
 app.get('/', (req, res) => {
@@ -78,6 +79,26 @@ app.post('/login', (req, res) => {
     if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
     const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '1h' });
     res.json({ token, user: { id: user.id, username: user.username, full_name: user.full_name } });
+  });
+});
+
+// Create group route
+app.post('/groups', (req, res) => {
+  const { name, description, creator_id } = req.body;
+  if (!name) return res.status(400).json({ error: 'Name required' });
+  const query = 'INSERT INTO groups (name, description, creator_id) VALUES (?, ?, ?)';
+  db.query(query, [name, description, creator_id || null], (err, result) => {
+    if (err) return res.status(500).json({ error: 'Database error' });
+    res.status(201).json({ id: result.insertId, name, description, creator_id });
+  });
+});
+
+// Get groups route
+app.get('/groups', (req, res) => {
+  const query = 'SELECT * FROM groups';
+  db.query(query, (err, results) => {
+    if (err) return res.status(500).json({ error: 'Database error' });
+    res.json(results);
   });
 });
 

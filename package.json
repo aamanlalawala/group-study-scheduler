@@ -4,6 +4,7 @@
   "description": "A web app for students to coordinate study groups, schedule sessions, assign tasks, and share notes.",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
