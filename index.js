@@ -14,6 +14,19 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+// MySQL connection
+const db = mysql.createConnection({
+  host: 'localhost',
+  user: 'root',
+  password: '',
+  database: 'study_scheduler'
+});
+
+db.connect((err) => {
+  if (err) console.error('Error connecting to MySQL:', err);
+  else console.log('Connected to MySQL database');
+});
+
 // Middleware to parse JSON requests
 app.use(express.json());
 
