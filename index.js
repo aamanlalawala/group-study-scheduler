@@ -18,7 +18,7 @@ const transporter = nodemailer.createTransport({
 // Middleware to parse JSON requests
 app.use(express.json());
 // Serve static files from public folder (before any routes)
-app.use(express.static('public'));
+app.use(express.static('./public'));
 
 // MySQL connection
 const db = mysql.createConnection({
