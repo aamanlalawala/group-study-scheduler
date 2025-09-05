@@ -10,13 +10,15 @@ const JWT_SECRET = 'i@will*getco_op_hopefully';
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: 'groupscheduler846@gmail.com', pass: 'ubkcahiwygrzblvb' 
+    user: 'groupscheduler846@gmail.com',
+    pass: 'ubkcahiwygrzblvb'
   }
 });
 
-
 // Middleware to parse JSON requests
 app.use(express.json());
+// Serve static files from public folder (before any routes)
+app.use(express.static('public'));
 
 // MySQL connection
 const db = mysql.createConnection({
@@ -31,7 +33,6 @@ db.connect((err) => {
   else console.log('Connected to MySQL database');
 });
 
-// Basic route
 app.get('/', (req, res) => {
   res.send('Welcome to the Group Study Scheduler!');
 });
@@ -50,9 +51,8 @@ app.post('/signup', async (req, res) => {
         if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Username or email exists' });
         return res.status(500).json({ error: 'Database error' });
       }
-      // Send welcome email
       const mailOptions = {
-        from: 'yourgmail@gmail.com',
+        from: 'groupscheduler846@gmail.com',
         to: email,
         subject: 'Welcome to Group Study Scheduler!',
         text: `Hi ${full_name},\n\nThanks for signing up! Username: ${username}.\n\nStart coordinating groups.\n\nBest,\nGSS Team`
@@ -101,7 +101,6 @@ app.get('/groups', (req, res) => {
     res.json(results);
   });
 });
-// Created task route 
 app.post('/groups/:group_id/tasks', (req, res) => {
   const group_id = req.params.group_id; 
   const { title, assigned_to, due_date } = req.body; 
@@ -136,7 +135,6 @@ app.get('/groups/:group_id/tasks', (req, res) => {
   });
 });
 
-// Start the server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
