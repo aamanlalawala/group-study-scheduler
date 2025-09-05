@@ -101,6 +101,40 @@ app.get('/groups', (req, res) => {
     res.json(results);
   });
 });
+// Created task route 
+app.post('/groups/:group_id/tasks', (req, res) => {
+  const group_id = req.params.group_id; 
+  const { title, assigned_to, due_date } = req.body; 
+  if (!title) {
+    return res.status(400).json({ error: 'Title is required' });
+  }
+  if (due_date) {
+    const currentDate = new Date(); // Creates a Date object for today (e.g., 2025-09-05)
+    const taskDueDate = new Date(due_date); // Converts the user's due_date (e.g., "2025-09-12") to a Date object
+    if (taskDueDate <= currentDate) {
+      return res.status(400).json({ error: 'Due date must be in the future' });
+    }
+  }
+  const query = 'INSERT INTO tasks (group_id, title, assigned_to, due_date) VALUES (?, ?, ?, ?)';
+  db.query(query, [group_id, title, assigned_to || null, due_date || null], (err, result) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    res.status(201).json({ id: result.insertId, group_id, title, assigned_to, due_date });
+  });
+});
+
+// Get tasks for a group
+app.get('/groups/:group_id/tasks', (req, res) => {
+  const group_id = req.params.group_id;
+  const query = 'SELECT * FROM tasks WHERE group_id = ?';
+  db.query(query, [group_id], (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    res.json(results);
+  });
+});
 
 // Start the server
 app.listen(port, () => {

@@ -1,0 +1,15 @@
+.card {
+  border: none;
+  transition: transform 0.2s;
+}
+.card:hover {
+  transform: scale(1.02); /* Unique hover effect for interactivity */
+}
+#calendar-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+body {
+  background-color: #ecf0f1; /* Light gray background for a clean, unique feel */
+}
