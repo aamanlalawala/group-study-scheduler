@@ -160,13 +160,27 @@ document.getElementById('switch-to-login').addEventListener('click', (e) => { e.
 
 // Check if logged in on load
 if (localStorage.getItem('jwtToken')) {
-  userId = JSON.parse(atob(localStorage.getItem('jwtToken').split('.')[1])).id;
-  showSection('home-section');
-  document.getElementById('login-link').style.display = 'none';
-  document.getElementById('signup-link').style.display = 'none';
-  document.getElementById('logout-link').style.display = 'list-item';
-  loadGroups();
-  loadCalendar(selectedGroupId);
+  try {
+    const payload = JSON.parse(atob(localStorage.getItem('jwtToken').split('.')[1]));
+    userId = payload.id;
+    const username = payload.username; // Ensure username is available in the token payload
+    if (username) {
+      document.getElementById('username-span').textContent = username;
+      document.getElementById('user-info').style.display = 'list-item';
+    } else {
+      console.error('Username not found in JWT payload');
+    }
+    showSection('home-section');
+    document.getElementById('login-link').style.display = 'none';
+    document.getElementById('signup-link').style.display = 'none';
+    document.getElementById('logout-link').style.display = 'list-item';
+    loadGroups();
+    loadCalendar(selectedGroupId);
+  } catch (error) {
+    console.error('Error parsing JWT:', error);
+    localStorage.removeItem('jwtToken'); // Clear invalid token
+    showSection('login-section');
+  }
 } else {
   showSection('login-section');
 }
@@ -175,6 +189,7 @@ if (localStorage.getItem('jwtToken')) {
 function logout() {
   localStorage.removeItem('jwtToken');
   userId = null;
+  document.getElementById('user-info').style.display = 'none'; // Hide username on logout
   showSection('login-section');
   document.getElementById('login-link').style.display = 'list-item';
   document.getElementById('signup-link').style.display = 'list-item';
@@ -200,6 +215,8 @@ document.getElementById('login-form').addEventListener('submit', (e) => {
         localStorage.setItem('jwtToken', data.token);
         userId = data.user.id;
         console.log('User ID stored on login:', userId);
+        document.getElementById('username-span').textContent = data.user.username; // Set username
+        document.getElementById('user-info').style.display = 'list-item'; // Show username
         showSection('home-section');
         document.getElementById('login-link').style.display = 'none';
         document.getElementById('signup-link').style.display = 'none';
