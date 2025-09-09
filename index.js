@@ -17,8 +17,8 @@ const transporter = nodemailer.createTransport({
 
 // Middleware to parse JSON requests
 app.use(express.json());
-// Serve static files from public folder (before any routes)
-app.use(express.static('./public'));
+// Serve static files from public folder
+app.use(express.static('./public')); // Move your frontend files here
 
 // MySQL connection
 const db = mysql.createConnection({
@@ -32,6 +32,19 @@ db.connect((err) => {
   if (err) console.error('Error connecting to MySQL:', err);
   else console.log('Connected to MySQL database');
 });
+
+// Auth middleware
+const authenticateToken = (req, res, next) => {
+  const token = req.headers['authorization'];
+  if (!token) return res.status(401).json({ error: 'Access denied' });
+  try {
+    const verified = jwt.verify(token, JWT_SECRET);
+    req.user = verified;
+    next();
+  } catch (err) {
+    res.status(400).json({ error: 'Invalid token' });
+  }
+};
 
 app.get('/', (req, res) => {
   res.send('Welcome to the Group Study Scheduler!');
@@ -82,55 +95,50 @@ app.post('/login', (req, res) => {
   });
 });
 
-// Create group route
-app.post('/groups', (req, res) => {
-  const { name, description, creator_id } = req.body;
+// Create group route (added)
+app.post('/groups', authenticateToken, (req, res) => {
+  const { name, description } = req.body;
+  const creator_id = req.user.id; // From JWT
   if (!name) return res.status(400).json({ error: 'Name required' });
   const query = 'INSERT INTO groups (name, description, creator_id) VALUES (?, ?, ?)';
-  db.query(query, [name, description, creator_id || null], (err, result) => {
+  db.query(query, [name, description || null, creator_id], (err, result) => {
     if (err) return res.status(500).json({ error: 'Database error' });
-    res.status(201).json({ id: result.insertId, name, description, creator_id });
+    res.status(201).json({ id: result.insertId, name, description });
   });
 });
 
-// Get groups route
-app.get('/groups', (req, res) => {
-  const query = 'SELECT * FROM groups';
+// Get groups route (added auth)
+app.get('/groups', authenticateToken, (req, res) => {
+  const query = 'SELECT * FROM groups'; // Optionally filter by req.user.id
   db.query(query, (err, results) => {
     if (err) return res.status(500).json({ error: 'Database error' });
     res.json(results);
   });
 });
-app.post('/groups/:group_id/tasks', (req, res) => {
-  const group_id = req.params.group_id; 
-  const { title, assigned_to, due_date } = req.body; 
-  if (!title) {
-    return res.status(400).json({ error: 'Title is required' });
-  }
+
+// Create task (added auth)
+app.post('/groups/:group_id/tasks', authenticateToken, (req, res) => {
+  const group_id = req.params.group_id;
+  const { title, assigned_to, due_date } = req.body;
+  if (!title) return res.status(400).json({ error: 'Title is required' });
   if (due_date) {
-    const currentDate = new Date(); // Creates a Date object for today (e.g., 2025-09-05)
-    const taskDueDate = new Date(due_date); // Converts the user's due_date (e.g., "2025-09-12") to a Date object
-    if (taskDueDate <= currentDate) {
-      return res.status(400).json({ error: 'Due date must be in the future' });
-    }
+    const currentDate = new Date();
+    const taskDueDate = new Date(due_date);
+    if (taskDueDate <= currentDate) return res.status(400).json({ error: 'Due date must be in the future' });
   }
   const query = 'INSERT INTO tasks (group_id, title, assigned_to, due_date) VALUES (?, ?, ?, ?)';
   db.query(query, [group_id, title, assigned_to || null, due_date || null], (err, result) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
+    if (err) return res.status(500).json({ error: 'Database error' });
     res.status(201).json({ id: result.insertId, group_id, title, assigned_to, due_date });
   });
 });
 
-// Get tasks for a group
-app.get('/groups/:group_id/tasks', (req, res) => {
+// Get tasks for a group (added auth)
+app.get('/groups/:group_id/tasks', authenticateToken, (req, res) => {
   const group_id = req.params.group_id;
   const query = 'SELECT * FROM tasks WHERE group_id = ?';
   db.query(query, [group_id], (err, results) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
+    if (err) return res.status(500).json({ error: 'Database error' });
     res.json(results);
   });
 });
