@@ -1,8 +1,14 @@
 // Loading state and group fetch
+const socket = io('http://localhost:3000');
 document.querySelector('.content').classList.add('loading');
 
 let userId = null; // Store user ID globally
 let selectedGroupId = 1; // Default; make this dynamic later (e.g., from dropdown)
+
+socket.on('newTask', (newTask) => {
+  alert(`New task added: ${newTask.title}`);
+  loadCalendar(newTask.group_id); // Refresh calendar for the task's group
+});
 
 function loadGroups() {
   fetch('http://localhost:3000/groups', {

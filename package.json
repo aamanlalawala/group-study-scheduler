@@ -22,7 +22,10 @@
     "bcryptjs": "^3.0.2",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
     "mysql2": "^3.14.4",
-    "nodemailer": "^7.0.6"
+    "nodemailer": "^7.0.6",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
   }
 }

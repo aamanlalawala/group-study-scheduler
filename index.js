@@ -1,3 +1,6 @@
+const http = require('http');
+const server = http.createServer(app);
+const io = require('socket.io')(server)
 const express = require('express');
 const mysql = require('mysql2');
 const bcrypt = require('bcryptjs');
@@ -117,7 +120,7 @@ app.get('/groups', authenticateToken, (req, res) => {
 });
 
 // Create task (added auth)
-app.post('/groups/:group_id/tasks', authenticateToken, (req, res) => {
+app.post('/groups/:group_id/tasks', (req, res) => {
   const group_id = req.params.group_id;
   const { title, assigned_to, due_date } = req.body;
   if (!title) return res.status(400).json({ error: 'Title is required' });
@@ -128,8 +131,20 @@ app.post('/groups/:group_id/tasks', authenticateToken, (req, res) => {
   }
   const query = 'INSERT INTO tasks (group_id, title, assigned_to, due_date) VALUES (?, ?, ?, ?)';
   db.query(query, [group_id, title, assigned_to || null, due_date || null], (err, result) => {
-    if (err) return res.status(500).json({ error: 'Database error' });
-    res.status(201).json({ id: result.insertId, group_id, title, assigned_to, due_date });
+    if (err) {
+      console.error('Task creation error:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    const newTask = { id: result.insertId, group_id, title, assigned_to, due_date };
+    io.emit('newTask', newTask);
+    res.status(201).json(newTask);
+  });
+});
+
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
   });
 });
 
@@ -143,6 +158,6 @@ app.get('/groups/:group_id/tasks', authenticateToken, (req, res) => {
   });
 });
 
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
