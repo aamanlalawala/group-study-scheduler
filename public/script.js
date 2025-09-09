@@ -3,11 +3,13 @@ const socket = io('http://localhost:3000');
 document.querySelector('.content').classList.add('loading');
 
 let userId = null; // Store user ID globally
-let selectedGroupId = 1; // Default; make this dynamic later (e.g., from dropdown)
+let selectedGroupId = null; // Initialized dynamically
 
 socket.on('newTask', (newTask) => {
   alert(`New task added: ${newTask.title}`);
-  loadCalendar(newTask.group_id); // Refresh calendar for the task's group
+  if (newTask.group_id == selectedGroupId) {
+    loadCalendar(newTask.group_id); // Refresh if matching current group
+  }
 });
 
 function loadGroups() {
@@ -28,6 +30,21 @@ function loadGroups() {
         li.innerHTML = `${group.name}: ${group.description || 'No description'} <span class="badge">${group.id}</span>`;
         groupList.appendChild(li);
       });
+
+      // Populate group dropdown for tasks
+      const groupSelect = document.getElementById('task-group-id');
+      groupSelect.innerHTML = '';
+      groups.forEach(group => {
+        const option = document.createElement('option');
+        option.value = group.id;
+        option.textContent = group.name;
+        groupSelect.appendChild(option);
+      });
+      if (groups.length > 0) {
+        selectedGroupId = groupSelect.value; // Set to first option
+        loadCalendar(selectedGroupId);
+      }
+
       document.querySelector('.content').classList.remove('loading');
       console.log('Groups loaded successfully');
     })
@@ -56,11 +73,9 @@ function showSection(section) {
   sections.forEach(sec => document.getElementById(sec).style.display = 'none');
   document.getElementById(section).style.display = 'block';
   console.log('Switched to section:', section);
-  if (section === 'home-section' || section === 'groups-section' || section === 'calendar-section') {
-    if (localStorage.getItem('jwtToken')) {
-      if (section === 'home-section' || section === 'groups-section') loadGroups();
-      if (section === 'home-section' || section === 'calendar-section') loadCalendar(selectedGroupId);
-    }
+  if (localStorage.getItem('jwtToken')) {
+    if (section === 'home-section' || section === 'groups-section') loadGroups();
+    if (section === 'home-section' || section === 'calendar-section') loadCalendar(selectedGroupId);
   }
 }
 
@@ -78,7 +93,7 @@ document.getElementById('switch-to-login').addEventListener('click', (e) => { e.
 
 // Check if logged in on load
 if (localStorage.getItem('jwtToken')) {
-  userId = JSON.parse(atob(localStorage.getItem('jwtToken').split('.')[1])).id; // Extract userId from JWT payload (assuming it's there)
+  userId = JSON.parse(atob(localStorage.getItem('jwtToken').split('.')[1])).id;
   showSection('home-section');
   document.getElementById('login-link').style.display = 'none';
   document.getElementById('signup-link').style.display = 'none';
@@ -116,7 +131,7 @@ document.getElementById('login-form').addEventListener('submit', (e) => {
     .then(data => {
       if (data.token) {
         localStorage.setItem('jwtToken', data.token);
-        userId = data.user.id; // Store userId from response
+        userId = data.user.id;
         console.log('User ID stored on login:', userId);
         showSection('home-section');
         document.getElementById('login-link').style.display = 'none';
@@ -166,7 +181,7 @@ document.getElementById('group-form').addEventListener('submit', (e) => {
   fetch('http://localhost:3000/groups', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': localStorage.getItem('jwtToken') },
-    body: JSON.stringify({ name, description, creator_id: userId }) // Add creator_id if your DB requires it
+    body: JSON.stringify({ name, description })
   })
     .then(response => {
       if (!response.ok) throw new Error('Group creation failed');
@@ -174,7 +189,7 @@ document.getElementById('group-form').addEventListener('submit', (e) => {
     })
     .then(data => {
       console.log('Group created:', data);
-      loadGroups();
+      loadGroups(); // Reload groups and dropdown
     })
     .catch(error => console.error('Error creating group:', error));
 });
@@ -198,7 +213,7 @@ function loadCalendar(group_id) {
       const calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'dayGridMonth',
         events: tasks.map(task => ({
-          title: task.title,
+          title: task.title + (task.file_path ? ' (with note)' : ''), // Optional: Indicate if note attached
           start: task.due_date,
           allDay: true
         }))
@@ -212,19 +227,45 @@ function loadCalendar(group_id) {
     });
 }
 
+// Update selectedGroupId when dropdown changes
+document.getElementById('task-group-id').addEventListener('change', (e) => {
+  selectedGroupId = e.target.value;
+  loadCalendar(selectedGroupId); // Refresh calendar for selected group
+});
+
 document.getElementById('task-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const title = document.getElementById('task-title').value;
   const assigned_to = document.getElementById('assigned-to').value;
   const due_date = document.getElementById('due-date').value;
+  selectedGroupId = document.getElementById('task-group-id').value;
+  const file = document.getElementById('task-note').files[0]; // Optional file
+
   if (!localStorage.getItem('jwtToken')) {
     alert('Please log in to create tasks.');
     return;
   }
+  if (!selectedGroupId) {
+    alert('Please select a group.');
+    return;
+  }
+  if (!title) {
+    alert('Title is required.');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('title', title);
+  formData.append('assigned_to', assigned_to);
+  formData.append('due_date', due_date);
+  if (file) {
+    formData.append('note', file); // Attach file if selected
+  }
+
   fetch(`http://localhost:3000/groups/${selectedGroupId}/tasks`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': localStorage.getItem('jwtToken') },
-    body: JSON.stringify({ title, assigned_to, due_date })
+    headers: { 'Authorization': localStorage.getItem('jwtToken') },
+    body: formData // No Content-Type header; browser sets multipart/form-data
   })
     .then(response => {
       if (!response.ok) throw new Error('Task creation failed');
@@ -232,7 +273,15 @@ document.getElementById('task-form').addEventListener('submit', (e) => {
     })
     .then(data => {
       console.log('Task created:', data);
+      alert('Task created successfully!' + (data.file_path ? ` Note attached: ${data.file_path}` : ''));
       loadCalendar(selectedGroupId);
     })
     .catch(error => console.error('Error:', error));
 });
+
+events: tasks.map(task => ({
+  title: task.title + (task.file_path ? ' (Note attached)' : ''),
+  start: task.due_date,
+  allDay: true,
+  url: task.file_path ? `http://localhost:3000${task.file_path}` : null  // Link to download
+}))

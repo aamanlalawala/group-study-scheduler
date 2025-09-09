@@ -122,6 +122,16 @@ body {
   background: rgba(255, 255, 255, 0.8);
 }
 
+.section form input[type="file"] {
+  padding: 0.5rem;
+  border-radius: 5px;
+  border: none;
+  font-size: 1rem;
+  background: #fff;
+  color: #000;
+}
+
+
 #group-list {
   list-style: none;
   padding: 0;

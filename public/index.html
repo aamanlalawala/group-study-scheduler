@@ -5,8 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Group Study Scheduler</title>
     <link rel="stylesheet" href="style.css">
+    <!-- FullCalendar CDN -->
     <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+    <!-- Socket.IO CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.5/dist/socket.io.min.js"></script>
 </head>
 <body>
     <nav class="nav-bar">
@@ -96,7 +99,7 @@
                         </div>
                         <button type="submit">Create Group</button>
                     </form>
-                    <ul id="group-list"></ul> <!-- Duplicate list if needed -->
+                    <ul id="group-list"></ul>
                 </div>
             </div>
 
@@ -105,6 +108,12 @@
                 <div class="section">
                     <h2>Calendar</h2>
                     <form id="task-form">
+                        <div>
+                            <label>Group</label>
+                            <select id="task-group-id">
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
                         <div>
                             <label>Task Title</label>
                             <input type="text" id="task-title">
@@ -116,6 +125,10 @@
                         <div>
                             <label>Due Date</label>
                             <input type="date" id="due-date">
+                        </div>
+                        <div>
+                            <label>Attach Note (Optional)</label>
+                            <input type="file" id="task-note" accept=".pdf,.doc,.docx,.txt">
                         </div>
                         <button type="submit">Create Task</button>
                     </form>

@@ -1,14 +1,46 @@
-const http = require('http');
-const server = http.createServer(app);
-const io = require('socket.io')(server)
 const express = require('express');
 const mysql = require('mysql2');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const http = require('http');
+const socketIo = require('socket.io');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
 const port = 3000;
 const JWT_SECRET = 'i@will*getco_op_hopefully';
+
+// Ensure uploads folder exists
+const uploadDir = path.join(__dirname, 'public/uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + '-' + file.originalname);
+  }
+});
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /pdf|doc|docx|txt/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    if (extname && mimetype) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only .pdf, .doc, .docx, .txt allowed!'));
+    }
+  }
+});
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -21,7 +53,7 @@ const transporter = nodemailer.createTransport({
 // Middleware to parse JSON requests
 app.use(express.json());
 // Serve static files from public folder
-app.use(express.static('./public')); // Move your frontend files here
+app.use(express.static(path.join(__dirname, 'public')));
 
 // MySQL connection
 const db = mysql.createConnection({
@@ -98,10 +130,10 @@ app.post('/login', (req, res) => {
   });
 });
 
-// Create group route (added)
+// Create group route
 app.post('/groups', authenticateToken, (req, res) => {
   const { name, description } = req.body;
-  const creator_id = req.user.id; // From JWT
+  const creator_id = req.user.id;
   if (!name) return res.status(400).json({ error: 'Name required' });
   const query = 'INSERT INTO groups (name, description, creator_id) VALUES (?, ?, ?)';
   db.query(query, [name, description || null, creator_id], (err, result) => {
@@ -110,34 +142,55 @@ app.post('/groups', authenticateToken, (req, res) => {
   });
 });
 
-// Get groups route (added auth)
+// Get groups route
 app.get('/groups', authenticateToken, (req, res) => {
-  const query = 'SELECT * FROM groups'; // Optionally filter by req.user.id
+  const query = 'SELECT * FROM groups';
   db.query(query, (err, results) => {
     if (err) return res.status(500).json({ error: 'Database error' });
     res.json(results);
   });
 });
 
-// Create task (added auth)
-app.post('/groups/:group_id/tasks', (req, res) => {
+// Create task route with optional file upload and WebSocket
+app.post('/groups/:group_id/tasks', authenticateToken, upload.single('note'), (req, res) => {
   const group_id = req.params.group_id;
+  console.log('Incoming request body:', req.body);  // Prints the text parts
+  console.log('Incoming file:', req.file);         // Prints the file info (if any)
+  
+  // Now safely check if req.body exists before pulling stuff
+  if (!req.body) {
+    return res.status(400).json({ error: 'No data received in request' });
+  }
+  
   const { title, assigned_to, due_date } = req.body;
+  const filePath = req.file ? `./public/uploads/${req.file.filename}` : null;
+
   if (!title) return res.status(400).json({ error: 'Title is required' });
   if (due_date) {
     const currentDate = new Date();
     const taskDueDate = new Date(due_date);
     if (taskDueDate <= currentDate) return res.status(400).json({ error: 'Due date must be in the future' });
   }
-  const query = 'INSERT INTO tasks (group_id, title, assigned_to, due_date) VALUES (?, ?, ?, ?)';
-  db.query(query, [group_id, title, assigned_to || null, due_date || null], (err, result) => {
+
+  const query = 'INSERT INTO tasks (group_id, title, assigned_to, due_date, file_path) VALUES (?, ?, ?, ?, ?)';
+  db.query(query, [group_id, title, assigned_to || null, due_date || null, filePath], (err, result) => {
     if (err) {
       console.error('Task creation error:', err);
       return res.status(500).json({ error: 'Database error' });
     }
-    const newTask = { id: result.insertId, group_id, title, assigned_to, due_date };
-    io.emit('newTask', newTask);
+    const newTask = { id: result.insertId, group_id, title, assigned_to, due_date, file_path: filePath };
+    io.emit('newTask', newTask); // Broadcast to all connected clients
     res.status(201).json(newTask);
+  });
+});
+
+// Get tasks for a group
+app.get('/groups/:group_id/tasks', authenticateToken, (req, res) => {
+  const group_id = req.params.group_id;
+  const query = 'SELECT * FROM tasks WHERE group_id = ?';
+  db.query(query, [group_id], (err, results) => {
+    if (err) return res.status(500).json({ error: 'Database error' });
+    res.json(results);
   });
 });
 
@@ -145,16 +198,6 @@ io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
-  });
-});
-
-// Get tasks for a group (added auth)
-app.get('/groups/:group_id/tasks', authenticateToken, (req, res) => {
-  const group_id = req.params.group_id;
-  const query = 'SELECT * FROM tasks WHERE group_id = ?';
-  db.query(query, [group_id], (err, results) => {
-    if (err) return res.status(500).json({ error: 'Database error' });
-    res.json(results);
   });
 });
 
