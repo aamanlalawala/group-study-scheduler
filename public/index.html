@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Group Study Scheduler</title>
     <link rel="stylesheet" href="style.css">
-    <!-- FullCalendar CDN -->
     <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
-    <!-- Socket.IO CDN -->
     <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.5/dist/socket.io.min.js"></script>
 </head>
 <body>
@@ -20,6 +18,7 @@
             <li><a href="#" id="login-link">Login</a></li>
             <li><a href="#" id="signup-link">Signup</a></li>
             <li><a href="#" id="logout-link" style="display: none;">Logout</a></li>
+            <li><a href="#" id="theme-toggle">🌙</a></li>
         </ul>
     </nav>
 
@@ -30,7 +29,7 @@
                 <h1>Group Study Scheduler</h1>
                 <div class="section">
                     <h2>Groups</h2>
-                    <ul id="group-list"></ul>
+                    <ul id="group-list"></ul> <!-- Members will be appended here -->
                 </div>
                 <div class="section">
                     <h2>Calendar</h2>
@@ -99,7 +98,12 @@
                         </div>
                         <button type="submit">Create Group</button>
                     </form>
-                    <ul id="group-list"></ul>
+                    <ul id="group-list"></ul> <!-- Same as home, with members -->
+                    <div id="join-group">
+                        <label>Join Existing Group (ID)</label>
+                        <input type="number" id="join-group-id">
+                        <button id="join-button">Join</button>
+                    </div>
                 </div>
             </div>
 
@@ -120,7 +124,9 @@
                         </div>
                         <div>
                             <label>Assigned To</label>
-                            <input type="text" id="assigned-to">
+                            <select id="assigned-to">
+                                <!-- Populated dynamically based on selected group members -->
+                            </select>
                         </div>
                         <div>
                             <label>Due Date</label>
@@ -128,7 +134,7 @@
                         </div>
                         <div>
                             <label>Attach Note (Optional)</label>
-                            <input type="file" id="task-note" accept=".pdf,.doc,.docx,.txt">
+                            <input type="file" id="task-note" name="note" accept=".pdf,.doc,.docx,.txt">
                         </div>
                         <button type="submit">Create Task</button>
                     </form>

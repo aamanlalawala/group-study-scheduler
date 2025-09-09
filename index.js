@@ -138,14 +138,54 @@ app.post('/groups', authenticateToken, (req, res) => {
   const query = 'INSERT INTO groups (name, description, creator_id) VALUES (?, ?, ?)';
   db.query(query, [name, description || null, creator_id], (err, result) => {
     if (err) return res.status(500).json({ error: 'Database error' });
+    // Automatically add creator as member
+    const memberQuery = 'INSERT INTO group_members (group_id, user_id) VALUES (?, ?)';
+    db.query(memberQuery, [result.insertId, creator_id], (memberErr) => {
+      if (memberErr) console.error('Error adding creator to members:', memberErr);
+    });
     res.status(201).json({ id: result.insertId, name, description });
   });
 });
 
-// Get groups route
+// Get groups route (filtered by user's membership)
 app.get('/groups', authenticateToken, (req, res) => {
-  const query = 'SELECT * FROM groups';
-  db.query(query, (err, results) => {
+  const user_id = req.user.id;
+  const query = `
+    SELECT g.* FROM groups g
+    JOIN group_members gm ON g.id = gm.group_id
+    WHERE gm.user_id = ?
+  `;
+  db.query(query, [user_id], (err, results) => {
+    if (err) return res.status(500).json({ error: 'Database error' });
+    res.json(results);
+  });
+});
+
+// Join group route (new)
+app.post('/groups/:group_id/join', authenticateToken, (req, res) => {
+  const group_id = req.params.group_id;
+  const user_id = req.user.id;
+  const checkQuery = 'SELECT * FROM group_members WHERE group_id = ? AND user_id = ?';
+  db.query(checkQuery, [group_id, user_id], (err, results) => {
+    if (err) return res.status(500).json({ error: 'Database error' });
+    if (results.length > 0) return res.status(400).json({ error: 'Already a member' });
+    const joinQuery = 'INSERT INTO group_members (group_id, user_id) VALUES (?, ?)';
+    db.query(joinQuery, [group_id, user_id], (joinErr) => {
+      if (joinErr) return res.status(500).json({ error: 'Database error' });
+      res.json({ message: 'Joined group successfully' });
+    });
+  });
+});
+
+// Get group members route (new)
+app.get('/groups/:group_id/members', authenticateToken, (req, res) => {
+  const group_id = req.params.group_id;
+  const query = `
+    SELECT u.username, u.full_name FROM users u
+    JOIN group_members gm ON u.id = gm.user_id
+    WHERE gm.group_id = ?
+  `;
+  db.query(query, [group_id], (err, results) => {
     if (err) return res.status(500).json({ error: 'Database error' });
     res.json(results);
   });
@@ -154,16 +194,8 @@ app.get('/groups', authenticateToken, (req, res) => {
 // Create task route with optional file upload and WebSocket
 app.post('/groups/:group_id/tasks', authenticateToken, upload.single('note'), (req, res) => {
   const group_id = req.params.group_id;
-  console.log('Incoming request body:', req.body);  // Prints the text parts
-  console.log('Incoming file:', req.file);         // Prints the file info (if any)
-  
-  // Now safely check if req.body exists before pulling stuff
-  if (!req.body) {
-    return res.status(400).json({ error: 'No data received in request' });
-  }
-  
   const { title, assigned_to, due_date } = req.body;
-  const filePath = req.file ? `./public/uploads/${req.file.filename}` : null;
+  const filePath = req.file ? `/uploads/${req.file.filename}` : null;
 
   if (!title) return res.status(400).json({ error: 'Title is required' });
   if (due_date) {

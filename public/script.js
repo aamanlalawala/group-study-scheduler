@@ -28,7 +28,20 @@ function loadGroups() {
         li.className = 'group-item';
         li.style.setProperty('--order', index);
         li.innerHTML = `${group.name}: ${group.description || 'No description'} <span class="badge">${group.id}</span>`;
+        const membersDiv = document.createElement('div');
+        membersDiv.className = 'members-list';
+        li.appendChild(membersDiv);
         groupList.appendChild(li);
+
+        // Fetch members for this group
+        fetch(`http://localhost:3000/groups/${group.id}/members`, {
+          headers: { 'Authorization': localStorage.getItem('jwtToken') }
+        })
+          .then(resp => resp.json())
+          .then(members => {
+            membersDiv.innerHTML = '<strong>Members:</strong> ' + members.map(m => m.username).join(', ') || 'No members yet';
+          })
+          .catch(err => console.error('Error fetching members:', err));
       });
 
       // Populate group dropdown for tasks
@@ -42,6 +55,7 @@ function loadGroups() {
       });
       if (groups.length > 0) {
         selectedGroupId = groupSelect.value; // Set to first option
+        loadAssignedToOptions(selectedGroupId); // Populate assigned_to for initial group
         loadCalendar(selectedGroupId);
       }
 
@@ -53,6 +67,59 @@ function loadGroups() {
       document.querySelector('.content').classList.remove('loading');
     });
 }
+
+// New function to populate assigned_to dropdown with group members
+function loadAssignedToOptions(group_id) {
+  fetch(`http://localhost:3000/groups/${group_id}/members`, {
+    headers: { 'Authorization': localStorage.getItem('jwtToken') }
+  })
+    .then(response => {
+      if (!response.ok) throw new Error('Failed to fetch members');
+      return response.json();
+    })
+    .then(members => {
+      const assignedSelect = document.getElementById('assigned-to');
+      assignedSelect.innerHTML = '';
+      if (members.length === 0) {
+        const option = document.createElement('option');
+        option.textContent = 'No members';
+        option.disabled = true;
+        option.selected = true;
+        assignedSelect.appendChild(option);
+      } else {
+        members.forEach(member => {
+          const option = document.createElement('option');
+          option.value = member.username; // Or member.id if preferring ID
+          option.textContent = member.username;
+          assignedSelect.appendChild(option);
+        });
+      }
+    })
+    .catch(error => {
+      console.error('Error fetching members for assigned_to:', error);
+      const assignedSelect = document.getElementById('assigned-to');
+      assignedSelect.innerHTML = '<option disabled>Error loading members</option>';
+    });
+}
+
+// Join group button
+document.getElementById('join-button').addEventListener('click', () => {
+  const group_id = document.getElementById('join-group-id').value;
+  if (!group_id) return alert('Enter a group ID');
+  fetch(`http://localhost:3000/groups/${group_id}/join`, {
+    method: 'POST',
+    headers: { 'Authorization': localStorage.getItem('jwtToken') }
+  })
+    .then(response => {
+      if (!response.ok) throw new Error('Join failed');
+      return response.json();
+    })
+    .then(data => {
+      alert(data.message);
+      loadGroups(); // Refresh groups list
+    })
+    .catch(error => alert('Error: ' + error.message));
+});
 
 // Doodle button interaction
 const doodleButton = document.querySelector('.doodle-button');
@@ -189,7 +256,7 @@ document.getElementById('group-form').addEventListener('submit', (e) => {
     })
     .then(data => {
       console.log('Group created:', data);
-      loadGroups(); // Reload groups and dropdown
+      loadGroups(); // Reload filtered groups
     })
     .catch(error => console.error('Error creating group:', error));
 });
@@ -213,10 +280,17 @@ function loadCalendar(group_id) {
       const calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'dayGridMonth',
         events: tasks.map(task => ({
-          title: task.title + (task.file_path ? ' (with note)' : ''), // Optional: Indicate if note attached
+          title: task.title + (task.file_path ? ' (with note)' : ''),
           start: task.due_date,
-          allDay: true
-        }))
+          allDay: true,
+          url: task.file_path ? `http://localhost:3000${task.file_path}` : null // Clickable note link
+        })),
+        eventClick: function(info) {
+          if (info.event.url) {
+            window.open(info.event.url);
+            info.jsEvent.preventDefault(); // Prevent navigation
+          }
+        }
       });
       calendar.render();
       console.log('Calendar rendered with', tasks.length, 'tasks');
@@ -230,6 +304,7 @@ function loadCalendar(group_id) {
 // Update selectedGroupId when dropdown changes
 document.getElementById('task-group-id').addEventListener('change', (e) => {
   selectedGroupId = e.target.value;
+  loadAssignedToOptions(selectedGroupId); // Load members for new group
   loadCalendar(selectedGroupId); // Refresh calendar for selected group
 });
 
@@ -279,9 +354,28 @@ document.getElementById('task-form').addEventListener('submit', (e) => {
     .catch(error => console.error('Error:', error));
 });
 
-events: tasks.map(task => ({
-  title: task.title + (task.file_path ? ' (Note attached)' : ''),
-  start: task.due_date,
-  allDay: true,
-  url: task.file_path ? `http://localhost:3000${task.file_path}` : null  // Link to download
-}))
+// Theme toggle logic
+const themeToggle = document.getElementById('theme-toggle');
+const body = document.body;
+
+function setTheme(theme) {
+  if (theme === 'light') {
+    body.classList.add('light-mode');
+    themeToggle.textContent = '☀️'; // Sun for light mode
+    localStorage.setItem('theme', 'light');
+  } else {
+    body.classList.remove('light-mode');
+    themeToggle.textContent = '🌙'; // Moon for dark mode
+    localStorage.setItem('theme', 'dark');
+  }
+}
+
+// Load saved theme on page load
+const savedTheme = localStorage.getItem('theme');
+setTheme(savedTheme || 'dark'); // Default to dark
+
+// Toggle on click
+themeToggle.addEventListener('click', () => {
+  const currentTheme = body.classList.contains('light-mode') ? 'light' : 'dark';
+  setTheme(currentTheme === 'light' ? 'dark' : 'light');
+});

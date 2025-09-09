@@ -4,11 +4,45 @@
   box-sizing: border-box;
 }
 
+:root {
+  --bg-color: #000;
+  --text-color: #fff;
+  --section-bg: rgba(255, 255, 255, 0.1);
+  --border-color: rgba(255, 255, 255, 0.5);
+  --hover-bg: rgba(255, 255, 255, 0.2);
+  --button-bg: #fff;
+  --button-text: #000;
+  --badge-bg: #fff;
+  --badge-text: #000;
+  --bg-image: url('https://www.transparenttextures.com/patterns/stardust.png');
+  --calendar-bg: var(--section-bg);
+  --calendar-text: var(--text-color);
+  --calendar-border: var(--border-color);
+  --calendar-event-bg: rgba(255, 255, 255, 0.3);
+}
+
+body.light-mode {
+  --bg-color: #f0f0f0;
+  --text-color: #000;
+  --section-bg: rgba(0, 0, 0, 0.1);
+  --border-color: rgba(0, 0, 0, 0.5);
+  --hover-bg: rgba(0, 0, 0, 0.2);
+  --button-bg: #000;
+  --button-text: #fff;
+  --badge-bg: #000;
+  --badge-text: #fff;
+  --bg-image: url('https://www.transparenttextures.com/patterns/stardust.png'); /* Lighter version if available */
+  --calendar-bg: rgba(0, 0, 0, 0.1);
+  --calendar-text: #000;
+  --calendar-border: rgba(0, 0, 0, 0.5);
+  --calendar-event-bg: rgba(0, 0, 0, 0.3);
+}
+
 body {
   font-family: 'Montserrat', sans-serif;
-  background: url('https://www.transparenttextures.com/patterns/stardust.png') repeat #000;
+  background: var(--bg-image) repeat var(--bg-color);
   background-size: 100px 100px;
-  color: #fff;
+  color: var(--text-color);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -35,7 +69,7 @@ body {
 }
 
 .nav-bar li a {
-  color: #fff;
+  color: var(--text-color);
   text-decoration: none;
   padding: 0.5rem 1rem;
   border-radius: 5px;
@@ -43,7 +77,7 @@ body {
 }
 
 .nav-bar li a:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--hover-bg);
 }
 
 .container {
@@ -65,8 +99,8 @@ body {
 }
 
 .section {
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px dashed rgba(255, 255, 255, 0.5);
+  background: var(--section-bg);
+  border: 2px dashed var(--border-color);
   border-radius: 10px;
   padding: 1.5rem;
   width: 100%;
@@ -84,7 +118,7 @@ body {
   font-size: 1.5rem;
   margin-bottom: 1rem;
   text-align: center;
-  border-bottom: 2px dashed rgba(255, 255, 255, 0.5);
+  border-bottom: 2px dashed var(--border-color);
 }
 
 .section form {
@@ -104,6 +138,7 @@ body {
 }
 
 .section form input,
+.section form select,
 .section form button {
   padding: 0.5rem;
   border-radius: 5px;
@@ -112,25 +147,15 @@ body {
 }
 
 .section form button {
-  background: #fff;
-  color: #000;
+  background: var(--button-bg);
+  color: var(--button-text);
   cursor: pointer;
   transition: background 0.3s;
 }
 
 .section form button:hover {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(var(--button-bg), 0.8);
 }
-
-.section form input[type="file"] {
-  padding: 0.5rem;
-  border-radius: 5px;
-  border: none;
-  font-size: 1rem;
-  background: #fff;
-  color: #000;
-}
-
 
 #group-list {
   list-style: none;
@@ -138,26 +163,31 @@ body {
 }
 
 .group-item {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--section-bg);
   margin-bottom: 0.7rem;
   padding: 0.9rem;
   border-radius: 10px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
   animation: slideIn 0.8s ease-out backwards;
 }
 
 .group-item:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--hover-bg);
 }
 
 .group-item .badge {
-  background: #fff;
-  color: #000;
+  background: var(--badge-bg);
+  color: var(--badge-text);
   padding: 0.5rem 1rem;
   border-radius: 50%;
   font-weight: bold;
+}
+
+.members-list {
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  color: var(--text-color);
 }
 
 #calendar-container {
@@ -165,13 +195,39 @@ body {
   width: 100%;
 }
 
+.fc { /* Better calendar CSS */
+  background: var(--calendar-bg);
+  color: var(--calendar-text);
+  border: 1px solid var(--calendar-border);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.fc .fc-daygrid-day {
+  background: var(--section-bg);
+  border: 1px dashed var(--border-color);
+}
+
+.fc .fc-event {
+  background: var(--calendar-event-bg);
+  border: none;
+  border-radius: 5px;
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: transform 0.3s;
+}
+
+.fc .fc-event:hover {
+  transform: scale(1.05);
+}
+
 .doodle-button {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  background: #fff;
-  color: #000;
-  border: 2px dashed #fff;
+  background: var(--button-bg);
+  color: var(--button-text);
+  border: 2px dashed var(--border-color);
   border-radius: 50%;
   width: 50px;
   height: 50px;
