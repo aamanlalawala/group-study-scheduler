@@ -1,14 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Group Study Scheduler</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.css">
     <link rel="stylesheet" href="style.css">
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.5/dist/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.js"></script>
+    <script src="https://cdn.socket.io/4.4.0/socket.io.min.js"></script>
 </head>
+
 <body>
     <nav class="nav-bar">
         <ul>
@@ -25,123 +27,123 @@
 
     <div class="container">
         <div class="content">
-            <!-- Home Section -->
-            <div id="home-section" style="display: none;">
-                <h1>Group Study Scheduler</h1>
+            <section id="home-section">
+                <div class="section">
+                    <h2>Group Study Scheduler</h2>
+                    <div id="analytics-container">
+                        <h3>Your Analytics</h3>
+                        <p><strong>Groups Joined:</strong> <span id="groups-joined">0</span></p>
+                        <p><strong>Groups Created:</strong> <span id="groups-created">0</span></p>
+                        <p><strong>Pending Tasks:</strong> <span id="pending-tasks">0</span></p>
+                        <p><strong>Total Tasks Assigned:</strong> <span id="total-tasks">0</span></p>
+                    </div>
+                </div>
                 <div class="section">
                     <h2>Groups</h2>
-                    <ul id="group-list"></ul> <!-- Members will be appended here -->
+                    <ul id="group-list"></ul>
                 </div>
                 <div class="section">
                     <h2>Calendar</h2>
                     <div id="calendar-container"></div>
                 </div>
-            </div>
+            </section>
 
-            <!-- Login Section -->
-            <div id="login-section" style="display: block;">
-                <div class="section">
-                    <h2>Login</h2>
-                    <form id="login-form">
-                        <div>
-                            <label>Username</label>
-                            <input type="text" id="username">
-                        </div>
-                        <div>
-                            <label>Password</label>
-                            <input type="password" id="password">
-                        </div>
-                        <button type="submit">Login</button>
-                    </form>
-                    <p>Not registered? <a href="#" id="switch-to-signup">Signup</a></p>
-                </div>
-            </div>
+            <section id="login-section" class="section">
+                <h2>Login</h2>
+                <form id="login-form">
+                    <div>
+                        <label for="username">Username</label>
+                        <input type="text" id="username">
+                        <span id="login-error" style="color: red; font-size: 0.9rem;"></span>
+                    </div>
+                    <div>
+                        <label for="password">Password</label>
+                        <input type="password" id="password">
+                    </div>
+                    <button type="submit">Login</button>
+                </form>
+                <p>Not registered? <a href="#" id="switch-to-signup">Signup</a></p>
+            </section>
 
-            <!-- Signup Section -->
-            <div id="signup-section" style="display: none;">
-                <div class="section">
-                    <h2>Signup</h2>
-                    <form id="signup-form">
-                        <div>
-                            <label>Username</label>
-                            <input type="text" id="signup-username">
-                        </div>
-                        <div>
-                            <label>Password</label>
-                            <input type="password" id="signup-password">
-                        </div>
-                        <div>
-                            <label>Email</label>
-                            <input type="email" id="signup-email">
-                        </div>
-                        <div>
-                            <label>Full Name</label>
-                            <input type="text" id="signup-full_name">
-                        </div>
-                        <button type="submit">Signup</button>
-                    </form>
-                    <p>Already have an account? <a href="#" id="switch-to-login">Login</a></p>
-                </div>
-            </div>
+            <section id="signup-section" class="section">
+                <h2>Signup</h2>
+                <form id="signup-form">
+                    <div>
+                        <label for="signup-username">Username</label>
+                        <input type="text" id="signup-username">
+                        <span id="signup-username-error" style="color: red; font-size: 0.9rem;"></span>
+                    </div>
+                    <div>
+                        <label for="signup-password">Password</label>
+                        <input type="password" id="signup-password">
+                    </div>
+                    <div>
+                        <label for="signup-email">Email</label>
+                        <input type="email" id="signup-email">
+                        <span id="signup-email-error" style="color: red; font-size: 0.9rem;"></span>
+                    </div>
+                    <div>
+                        <label for="signup-full_name">Full Name</label>
+                        <input type="text" id="signup-full_name">
+                    </div>
+                    <button type="submit">Signup</button>
+                </form>
+                <p>Already have an account? <a href="#" id="switch-to-login">Login</a></p>
+            </section>
 
-            <!-- Groups Section -->
-            <div id="groups-section" style="display: none;">
+            <section id="groups-section" style="display: none;">
                 <div class="section">
                     <h2>Study Groups</h2>
                     <form id="group-form">
                         <div>
-                            <label>Group Name</label>
-                            <input type="text" id="group-name">
+                            <label for="group-name">Group Name</label>
+                            <input type="text" id="group-name" required>
                         </div>
                         <div>
-                            <label>Description</label>
+                            <label for="group-description">Description</label>
                             <input type="text" id="group-description">
                         </div>
                         <button type="submit">Create Group</button>
                     </form>
-                    <ul id="group-list"></ul> <!-- Same as home, with members -->
-                    <div id="join-group">
-                        <label>Join Existing Group (ID)</label>
-                        <input type="number" id="join-group-id">
+                    <form id="join-group-form">
+                        <div>
+                            <label for="join-group-code">Join Existing Group (Code)</label>
+                            <input type="text" id="join-group-code">
+                        </div>
                         <button id="join-button">Join</button>
-                    </div>
+                    </form>
                 </div>
-            </div>
+            </section>
 
-            <!-- Calendar Section -->
-            <div id="calendar-section" style="display: none;">
+            <section id="calendar-section" style="display: none;">
                 <div class="section">
                     <h2>Calendar</h2>
                     <form id="task-form">
                         <div>
-                            <label>Group</label>
-                            <select id="task-group-id">
-                                <!-- Populated dynamically -->
-                            </select>
+                            <label for="task-group-id">Group</label>
+                            <select id="task-group-id" required></select>
                         </div>
                         <div>
-                            <label>Task Title</label>
-                            <input type="text" id="task-title">
+                            <label for="task-title">Task Title</label>
+                            <input type="text" id="task-title" required>
                         </div>
                         <div>
-                            <label>Assigned To</label>
-                            <select id="assigned-to">
-                                <!-- Populated dynamically based on selected group members -->
-                            </select>
+                            <label for="assigned-to">Assigned To</label>
+                            <select id="assigned-to" required></select>
                         </div>
                         <div>
-                            <label>Due Date</label>
+                            <label for="due-date">Due Date</label>
                             <input type="date" id="due-date">
                         </div>
                         <div>
-                            <label>Attach Note (Optional)</label>
-                            <input type="file" id="task-note" name="note" accept=".pdf,.doc,.docx,.txt">
+                            <label for="task-note">Attach Note (Optional)</label>
+                            <input type="file" id="task-note" accept=".pdf,.doc,.docx,.txt">
                         </div>
                         <button type="submit">Create Task</button>
                     </form>
                     <div id="calendar-container"></div>
                 </div>
-            </div>
+            </section>
         </div>
     </div>
 
@@ -149,4 +151,5 @@
 
     <script src="script.js"></script>
 </body>
+
 </html>
