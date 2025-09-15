@@ -1,44 +1,53 @@
-const socket = io('http://localhost:3000');
+// -------------------- CONFIG --------------------
+const API_URL = window.location.hostname.includes('localhost')
+  ? 'http://localhost:3000'
+  : 'https://your-render-app.onrender.com'; 
+
+const socket = io(API_URL);
 document.querySelector('.content').classList.add('loading');
 
 let userId = null;
 let username = null;
 let selectedGroupId = null;
 
-// Handle new task notifications via WebSocket
+// Helper to include auth header
+function authHeaders(extra = {}) {
+  const token = localStorage.getItem('jwtToken');
+  return token ? { Authorization: token, ...extra } : { ...extra };
+}
+
+// -------------------- SOCKET HANDLERS --------------------
 socket.on('newTask', newTask => {
-  alert(`New task added: ${newTask.title}`);
-  if (newTask.group_id == selectedGroupId) loadCalendar(newTask.group_id);
+  try {
+    alert(`New task added: ${newTask.title}`);
+    if (newTask.group_id == selectedGroupId) loadCalendar(newTask.group_id);
+  } catch (e) { console.warn(e); }
 });
 
-// Fetch and display user analytics
+// -------------------- ANALYTICS --------------------
 function loadAnalytics() {
-  fetch('http://localhost:3000/analytics', {
-    headers: { 'Authorization': localStorage.getItem('jwtToken') }
-  })
+  fetch(`${API_URL}/analytics`, { headers: authHeaders() })
     .then(response => {
       if (!response.ok) throw new Error('Failed to fetch analytics');
       return response.json();
     })
     .then(data => {
-      document.getElementById('groups-joined').textContent = data.groupsJoined;
-      document.getElementById('groups-created').textContent = data.groupsCreated;
-      document.getElementById('pending-tasks').textContent = data.pendingTasks;
-      document.getElementById('total-tasks').textContent = data.totalTasks;
+      document.getElementById('groups-joined').textContent = data.groupsJoined ?? 0;
+      document.getElementById('groups-created').textContent = data.groupsCreated ?? 0;
+      document.getElementById('pending-tasks').textContent = data.pendingTasks ?? 0;
+      document.getElementById('total-tasks').textContent = data.totalTasks ?? 0;
     })
     .catch(error => {
-      console.error('Error:', error);
+      console.error('Analytics error:', error);
       document.getElementById('analytics-container').innerHTML = '<p>Error loading analytics</p>';
     });
 }
 
-// Fetch and display groups for the user
+// -------------------- GROUPS --------------------
 function loadGroups() {
-  fetch('http://localhost:3000/groups', {
-    headers: { 'Authorization': localStorage.getItem('jwtToken') }
-  })
+  fetch(`${API_URL}/groups`, { headers: authHeaders() })
     .then(response => {
-      if (!response.ok) throw new Error('Network response was not ok');
+      if (!response.ok) throw new Error('Failed to fetch groups');
       return response.json();
     })
     .then(groups => {
@@ -49,14 +58,17 @@ function loadGroups() {
         li.className = 'group-item';
         li.style.setProperty('--order', index);
         li.innerHTML = `${group.name}: ${group.description || 'No description'} <span class="badge">${group.id}</span> <span class="join-code">Join Code: ${group.join_code}</span>`;
+
         const membersDiv = document.createElement('div');
         membersDiv.className = 'members-list';
         li.appendChild(membersDiv);
+
         const leaveButton = document.createElement('button');
         leaveButton.textContent = 'Leave Group';
         leaveButton.className = 'leave-button';
         leaveButton.onclick = () => leaveGroup(group.id, group.creator_id);
         li.appendChild(leaveButton);
+
         if (group.creator_id == userId) {
           const deleteButton = document.createElement('button');
           deleteButton.textContent = 'Delete Group';
@@ -64,16 +76,21 @@ function loadGroups() {
           deleteButton.onclick = () => deleteGroup(group.id);
           li.appendChild(deleteButton);
         }
+
         groupList.appendChild(li);
-        fetch(`http://localhost:3000/groups/${group.id}/members`, {
-          headers: { 'Authorization': localStorage.getItem('jwtToken') }
-        })
+
+        // load members
+        fetch(`${API_URL}/groups/${group.id}/members`, { headers: authHeaders() })
           .then(resp => resp.json())
           .then(members => {
-            membersDiv.innerHTML = '<strong>Members:</strong> ' + members.map(m => m.username).join(', ') || 'No members yet';
+            membersDiv.innerHTML = '<strong>Members:</strong> ' + (members.map(m => m.username).join(', ') || 'No members yet');
           })
-          .catch(error => console.error('Error:', error));
+          .catch(err => {
+            console.error('Members load error:', err);
+            membersDiv.innerHTML = '<strong>Members:</strong> Error loading';
+          });
       });
+
       const groupSelect = document.getElementById('task-group-id');
       groupSelect.innerHTML = '';
       groups.forEach(group => {
@@ -82,24 +99,24 @@ function loadGroups() {
         option.textContent = group.name;
         groupSelect.appendChild(option);
       });
+
       if (groups.length > 0) {
         selectedGroupId = groupSelect.value;
         loadAssignedToOptions(selectedGroupId);
         loadCalendar(selectedGroupId);
       }
+
       document.querySelector('.content').classList.remove('loading');
     })
     .catch(error => {
-      console.error('Error:', error);
+      console.error('Error fetching groups:', error);
       document.querySelector('.content').classList.remove('loading');
     });
 }
 
-// Populate assigned_to dropdown with group members
+// load assigned to options
 function loadAssignedToOptions(group_id) {
-  fetch(`http://localhost:3000/groups/${group_id}/members`, {
-    headers: { 'Authorization': localStorage.getItem('jwtToken') }
-  })
+  fetch(`${API_URL}/groups/${group_id}/members`, { headers: authHeaders() })
     .then(response => {
       if (!response.ok) throw new Error('Failed to fetch members');
       return response.json();
@@ -107,7 +124,7 @@ function loadAssignedToOptions(group_id) {
     .then(members => {
       const assignedSelect = document.getElementById('assigned-to');
       assignedSelect.innerHTML = '';
-      if (members.length === 0) {
+      if (!members || members.length === 0) {
         const option = document.createElement('option');
         option.textContent = 'No members';
         option.disabled = true;
@@ -123,19 +140,19 @@ function loadAssignedToOptions(group_id) {
       }
     })
     .catch(error => {
-      console.error('Error:', error);
+      console.error('Error loading assigned-to:', error);
       const assignedSelect = document.getElementById('assigned-to');
       assignedSelect.innerHTML = '<option disabled>Error loading members</option>';
     });
 }
 
-// Handle leaving a group
+// leave group
 function leaveGroup(group_id, creator_id) {
   if (!userId) return alert('Error: User not logged in. Please log in again.');
   if (confirm('Are you sure you want to leave this group?')) {
-    fetch(`http://localhost:3000/groups/${group_id}/leave`, {
+    fetch(`${API_URL}/groups/${group_id}/leave`, {
       method: 'DELETE',
-      headers: { 'Authorization': localStorage.getItem('jwtToken') }
+      headers: authHeaders()
     })
       .then(response => {
         if (!response.ok) throw new Error(response.status === 403 ? 'Group creator must delete the group instead' : response.statusText);
@@ -145,52 +162,58 @@ function leaveGroup(group_id, creator_id) {
         alert(data.message);
         loadGroups();
         loadAnalytics();
+        loadCalendar();
+        loadAssignedToOptions();
       })
       .catch(error => {
-        console.error('Error:', error);
+        console.error('Leave group error:', error);
         alert('Error: ' + error.message);
       });
   }
 }
 
-// Handle group deletion
+// delete group
 function deleteGroup(group_id) {
-  if (confirm('Are you sure you want to delete this group? This will remove all members and tasks.')) {
-    fetch(`http://localhost:3000/groups/${group_id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': localStorage.getItem('jwtToken') }
+  if (!confirm('Are you sure you want to delete this group? This will remove all members and tasks.')) return;
+  fetch(`${API_URL}/groups/${group_id}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  })
+    .then(response => {
+      if (!response.ok) throw new Error(response.statusText);
+      return response.json();
     })
-      .then(response => {
-        if (!response.ok) throw new Error(response.statusText);
-        return response.json();
-      })
-      .then(data => {
-        alert(data.message);
-        loadGroups();
-        loadAnalytics();
-      })
-      .catch(error => {
-        console.error('Error:', error);
-        alert('Error: ' + error.message);
-      });
-  }
+    .then(data => {
+      alert(data.message);
+      loadGroups();
+      loadAnalytics();
+      loadCalendar();
+      loadAssignedToOptions();
+    })
+    .catch(error => {
+      console.error('Delete group error:', error);
+      alert('Error: ' + error.message);
+    });
 }
 
-// Handle joining a group by code
-document.getElementById('join-button').addEventListener('click', () => {
+// join group by code
+document.getElementById('join-button').addEventListener('click', (e) => {
+  e.preventDefault();
   const join_code = document.getElementById('join-group-code').value;
   const errorElement = document.getElementById('join-error') || document.createElement('span');
   errorElement.id = 'join-error';
   errorElement.className = 'error-message';
   document.getElementById('join-group-code').after(errorElement);
   errorElement.textContent = '';
+
   if (!join_code) {
     errorElement.textContent = 'Please enter a join code';
     return;
   }
-  fetch(`http://localhost:3000/groups/join/code`, {
+
+  fetch(`${API_URL}/groups/join`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': localStorage.getItem('jwtToken') },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ join_code })
   })
     .then(response => {
@@ -203,18 +226,12 @@ document.getElementById('join-button').addEventListener('click', () => {
       loadAnalytics();
     })
     .catch(error => {
-      console.error('Error:', error);
+      console.error('Join error:', error);
       errorElement.textContent = error.message;
     });
 });
 
-// Handle doodle button click
-const doodleButton = document.querySelector('.doodle-button');
-if (doodleButton) {
-  doodleButton.addEventListener('click', () => alert('Doodle button clicked! Add new group soon!'));
-}
-
-// Manage SPA navigation and authentication
+// -------------------- AUTH UI --------------------
 function showSection(section) {
   const sections = ['home-section', 'login-section', 'signup-section', 'groups-section', 'calendar-section'];
   if (!localStorage.getItem('jwtToken') && section !== 'login-section' && section !== 'signup-section') {
@@ -241,24 +258,30 @@ document.getElementById('logout-link').addEventListener('click', e => { e.preven
 document.getElementById('switch-to-signup').addEventListener('click', e => { e.preventDefault(); showSection('signup-section'); });
 document.getElementById('switch-to-login').addEventListener('click', e => { e.preventDefault(); showSection('login-section'); });
 
+// Initialize UI depending on token
 if (localStorage.getItem('jwtToken')) {
-  const tokenPayload = JSON.parse(atob(localStorage.getItem('jwtToken').split('.')[1]));
-  userId = tokenPayload.id;
-  username = tokenPayload.username;
-  document.getElementById('username-span').textContent = username;
-  document.getElementById('user-info').style.display = 'list-item';
-  showSection('home-section');
-  document.getElementById('login-link').style.display = 'none';
-  document.getElementById('signup-link').style.display = 'none';
-  document.getElementById('logout-link').style.display = 'list-item';
-  loadGroups();
-  loadCalendar(selectedGroupId);
-  loadAnalytics();
+  try {
+    const tokenPayload = JSON.parse(atob(localStorage.getItem('jwtToken').split('.')[1]));
+    userId = tokenPayload.id;
+    username = tokenPayload.username;
+    document.getElementById('username-span').textContent = username;
+    document.getElementById('user-info').style.display = 'list-item';
+    showSection('home-section');
+    document.getElementById('login-link').style.display = 'none';
+    document.getElementById('signup-link').style.display = 'none';
+    document.getElementById('logout-link').style.display = 'list-item';
+    loadGroups();
+    loadCalendar(selectedGroupId);
+    loadAnalytics();
+  } catch (e) {
+    console.warn('Invalid token in storage:', e);
+    logout();
+  }
 } else {
   showSection('login-section');
 }
 
-// Handle user logout
+// logout
 function logout() {
   localStorage.removeItem('jwtToken');
   userId = null;
@@ -271,7 +294,7 @@ function logout() {
   document.getElementById('logout-link').style.display = 'none';
 }
 
-// Handle login form submission
+// -------------------- LOGIN / SIGNUP FORMS --------------------
 document.getElementById('login-form').addEventListener('submit', e => {
   e.preventDefault();
   const usernameInput = document.getElementById('username').value;
@@ -282,13 +305,13 @@ document.getElementById('login-form').addEventListener('submit', e => {
     errorElement.textContent = 'Please fill in all fields';
     return;
   }
-  fetch('http://localhost:3000/login', {
+  fetch(`${API_URL}/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: usernameInput, password })
   })
     .then(response => {
-      if (!response.ok) throw new Error(response.status === 401 ? response.statusText : 'Login failed');
+      if (!response.ok) throw new Error(response.status === 401 ? 'Incorrect credentials' : 'Login failed');
       return response.json();
     })
     .then(data => {
@@ -308,12 +331,11 @@ document.getElementById('login-form').addEventListener('submit', e => {
       }
     })
     .catch(error => {
-      console.error('Error:', error);
+      console.error('Login error:', error);
       errorElement.textContent = error.message === 'Login failed' ? 'An error occurred. Please try again.' : error.message;
     });
 });
 
-// Handle signup form submission
 document.getElementById('signup-form').addEventListener('submit', e => {
   e.preventDefault();
   const username = document.getElementById('signup-username').value;
@@ -329,7 +351,7 @@ document.getElementById('signup-form').addEventListener('submit', e => {
     if (!email) emailError.textContent = 'Email is required';
     return;
   }
-  fetch('http://localhost:3000/signup', {
+  fetch(`${API_URL}/signup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password, email, full_name })
@@ -343,25 +365,21 @@ document.getElementById('signup-form').addEventListener('submit', e => {
       showSection('login-section');
     })
     .catch(error => {
-      console.error('Error:', error);
-      if (error.message === 'Username already exists') {
-        usernameError.textContent = error.message;
-      } else if (error.message === 'Email already exists') {
-        emailError.textContent = error.message;
-      } else {
-        usernameError.textContent = 'An error occurred. Please try again.';
-      }
+      console.error('Signup error:', error);
+      const msg = error.message || 'An error occurred. Please try again.';
+      if (msg.toLowerCase().includes('username')) usernameError.textContent = msg;
+      else if (msg.toLowerCase().includes('email')) emailError.textContent = msg;
+      else usernameError.textContent = 'An error occurred. Please try again.';
     });
 });
 
-// Update selected group for tasks
+// -------------------- TASKS --------------------
 document.getElementById('task-group-id').addEventListener('change', e => {
   selectedGroupId = e.target.value;
   loadAssignedToOptions(selectedGroupId);
   loadCalendar(selectedGroupId);
 });
 
-// Handle task creation form submission
 document.getElementById('task-form').addEventListener('submit', e => {
   e.preventDefault();
   const title = document.getElementById('task-title').value;
@@ -372,18 +390,20 @@ document.getElementById('task-form').addEventListener('submit', e => {
   if (!localStorage.getItem('jwtToken')) return alert('Please log in to create tasks.');
   if (!selectedGroupId) return alert('Please select a group.');
   if (!title) return alert('Title is required.');
+
   const formData = new FormData();
   formData.append('title', title);
   formData.append('assigned_to', assigned_to);
   formData.append('due_date', due_date);
-  if (file) formData.append('note', file);
-  fetch(`http://localhost:3000/groups/${selectedGroupId}/tasks`, {
+  if (file) formData.append('note', file); // 'note' matches multer upload.single('note')
+
+  fetch(`${API_URL}/groups/${selectedGroupId}/tasks`, {
     method: 'POST',
-    headers: { 'Authorization': localStorage.getItem('jwtToken') },
+    headers: authHeaders(), // don't set Content-Type; browser sets multipart boundary
     body: formData
   })
     .then(response => {
-      if (!response.ok) throw new Error('Task creation failed');
+      if (!response.ok) return response.json().then(j => { throw new Error(j.error || 'Task creation failed'); });
       return response.json();
     })
     .then(data => {
@@ -391,14 +411,19 @@ document.getElementById('task-form').addEventListener('submit', e => {
       loadCalendar(selectedGroupId);
       loadAnalytics();
     })
-    .catch(error => console.error('Error:', error));
+    .catch(error => {
+      console.error('Task create error:', error);
+      alert('Error: ' + error.message);
+    });
 });
 
-// Load and render calendar with tasks
+// load and render calendar with tasks
 function loadCalendar(group_id) {
-  fetch(`http://localhost:3000/groups/${group_id}/tasks`, {
-    headers: { 'Authorization': localStorage.getItem('jwtToken') }
-  })
+  if (!group_id) {
+    document.getElementById('calendar-container').innerHTML = '<p class="text-center">No group selected.</p>';
+    return;
+  }
+  fetch(`${API_URL}/groups/${group_id}/tasks`, { headers: authHeaders() })
     .then(response => {
       if (!response.ok) throw new Error('Task fetch failed');
       return response.json();
@@ -406,17 +431,19 @@ function loadCalendar(group_id) {
     .then(tasks => {
       const calendarEl = document.getElementById('calendar-container');
       calendarEl.innerHTML = '';
-      if (tasks.length === 0) {
+      if (!tasks || tasks.length === 0) {
         calendarEl.innerHTML = '<p class="text-center">No tasks available for this group.</p>';
         return;
       }
+
+      // render FullCalendar
       const calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'dayGridMonth',
         events: tasks.map(task => ({
           title: task.title + (task.file_path ? ' (with note)' : ''),
           start: task.due_date,
           allDay: true,
-          url: task.file_path ? `http://localhost:3000${task.file_path}` : null
+          url: task.file_path ? `${task.file_path}` : null
         })),
         eventClick: function(info) {
           if (info.event.url) {
@@ -426,6 +453,8 @@ function loadCalendar(group_id) {
         }
       });
       calendar.render();
+
+      // task list
       const taskList = document.createElement('ul');
       taskList.id = 'task-list';
       tasks.forEach(task => {
@@ -440,54 +469,79 @@ function loadCalendar(group_id) {
       calendarEl.appendChild(taskList);
     })
     .catch(error => {
-      console.error('Error:', error);
+      console.error('Load calendar error:', error);
       document.getElementById('calendar-container').innerHTML = '<p class="text-center">Error loading calendar.</p>';
     });
 }
 
-// Mark a task as complete
+// mark as complete
 function markTaskComplete(task_id, group_id) {
-  if (confirm('Mark this task as complete? It will be removed.')) {
-    fetch(`http://localhost:3000/tasks/${task_id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': localStorage.getItem('jwtToken') }
+  if (!confirm('Mark this task as complete? It will be removed.')) return;
+  fetch(`${API_URL}/tasks/${task_id}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  })
+    .then(response => {
+      if (!response.ok) throw new Error('Complete failed');
+      return response.json();
     })
-      .then(response => {
-        if (!response.ok) throw new Error('Complete failed');
-        return response.json();
-      })
-      .then(data => {
-        alert(data.message);
-        loadCalendar(group_id);
-        loadAnalytics();
-      })
-      .catch(error => {
-        console.error('Error:', error);
-        alert('Error: ' + error.message);
-      });
-  }
+    .then(data => {
+      alert(data.message);
+      loadCalendar(group_id);
+      loadAnalytics();
+    })
+    .catch(error => {
+      console.error('Complete error:', error);
+      alert('Error: ' + error.message);
+    });
 }
 
-// Handle theme toggle
+document.getElementById('group-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const name = document.getElementById('group-name').value;
+  const description = document.getElementById('group-description').value;
+
+  if (!localStorage.getItem('jwtToken')) return alert('Please log in to create a group.');
+  if (!name) return alert('Group name is required.');
+
+  fetch(`${API_URL}/groups/`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ name, description })
+  })
+    .then(response => {
+      if (!response.ok) return response.json().then(j => { throw new Error(j.error || 'Group creation failed'); });
+      return response.json();
+    })
+    .then(data => {
+      alert('Group created successfully!');
+      document.getElementById('group-form').reset();
+      loadGroups();
+      loadAnalytics();
+    })
+    .catch(error => {
+      console.error('Group create error:', error);
+      alert('Error: ' + error.message);
+    });
+});
+
+// -------------------- THEME + DOODLE --------------------
+const doodleButton = document.querySelector('.doodle-button');
+if (doodleButton) doodleButton.addEventListener('click', () => alert('Doodle button clicked! Add new group soon!'));
+
 const themeToggle = document.getElementById('theme-toggle');
 const body = document.body;
-
 function setTheme(theme) {
   if (theme === 'light') {
-    body.classList.add('light-mode');
-    themeToggle.textContent = '☀️';
-    localStorage.setItem('theme', 'light');
+    body.classList.add('light-mode'); themeToggle.textContent = '☀️'; localStorage.setItem('theme', 'light');
   } else {
-    body.classList.remove('light-mode');
-    themeToggle.textContent = '🌙';
-    localStorage.setItem('theme', 'dark');
+    body.classList.remove('light-mode'); themeToggle.textContent = '🌙'; localStorage.setItem('theme', 'dark');
   }
 }
-
 const savedTheme = localStorage.getItem('theme');
 setTheme(savedTheme || 'dark');
-
 themeToggle.addEventListener('click', () => {
-  const currentTheme = body.classList.contains('light-mode') ? 'light' : 'dark';
-  setTheme(currentTheme === 'light' ? 'dark' : 'light');
+  const current = body.classList.contains('light-mode') ? 'light' : 'dark';
+  setTheme(current === 'light' ? 'dark' : 'light');
 });
+// ----------------------------------------------------// END OF FILE //----------------------------------------------------//
