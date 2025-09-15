@@ -1,7 +1,7 @@
 // -------------------- CONFIG --------------------
 const API_URL = window.location.hostname.includes('localhost')
   ? 'http://localhost:3000'
-  : 'https://your-render-app.onrender.com'; 
+  : 'https://group-study-scheduler.onrender.com'; 
 
 const socket = io(API_URL);
 document.querySelector('.content').classList.add('loading');
