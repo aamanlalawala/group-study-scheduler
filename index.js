@@ -12,13 +12,6 @@ const { nanoid } = require('nanoid');
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
-io.origins((origin, callback) => {
-  if (!origin || origin.endsWith('.onrender.com')) {
-    callback(null, true);
-  } else {
-    callback(new Error('Not allowed by CORS'));
-  }
-});
 const port = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
 
