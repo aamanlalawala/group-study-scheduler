@@ -1,9 +1,6 @@
 // -------------------- CONFIG --------------------
-const API_URL = window.location.hostname.includes('localhost')
-  ? 'http://localhost:3000'
-  : 'http://group-study-scheduler-1.onrender.com'; 
-
-const socket = io(API_URL);
+const API_URL = ''; // Relative path uses current protocol (HTTPS on Render)
+const socket = io(); // Relative Socket.io connection
 document.querySelector('.content').classList.add('loading');
 
 let userId = null;
